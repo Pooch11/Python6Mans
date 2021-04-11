@@ -1,151 +1,126 @@
 import discord
 from discord.ext import commands
 import random
+from datetime import datetime
 
-
-MAX_QUEUE = 6
-
-
+MAX_QUEUE = 4
+lobby_name = "queue"
+LOBBY_LISTINGS = []
 def setup(bot):
     bot.add_cog(QueueHandler(bot))
 
+class Lobby():
+    def __init__(self, lobbyNumber):
+        self.lobbyNumber = lobbyNumber
+        self.lobbyid = 0 #The channel Lobby ID
+        self.players =[] # A list of players in this lobby
+        self.team_one = [] #Players on team 1 'Blue'
+        self.team_two = [] #Players on team 2 'Orange
+        self.game_cred = {} #The credentials used to create the game
+    def addPlayer(self, player :discord.Member):
+        #Do a check if player already in THIS lobby
+        self.players.append(player)
+    def removePlayer(self, player :discord.Member):
+        self.players.remove(player)
+    def setCredentials(self, user, password):
+        self.game_cred = {user, password}
+    def setLobbyID(self, lobbyID):
+        self.id = lobbyID
+    def display(self):
+        return "Lobby Name: {0}\nLobby ID: {1}\nPlayers: {2} ".format(self.lobbyNumber, self.lobbyid, self.players)
 
 class QueueHandler(commands.Cog, name="Queue Commands"):
     def __init__(self, bot):
         self.bot = bot
-        self.orange_queue = []
         self.blue_queue = []
+        self.orange_queue = []
+        self.lobby_queue = []
         self.team_one = []
         self.team_two = []
-
+        self.q_emb_mention = ""
     @commands.command(name='q', aliases=['queue'], description='Allows a user to join the queue.')
     async def queue(self, ctx):
 
-        if ctx.channel.name != "blue_queue" and ctx.channel.name != "orange_queue":
+        if ctx.channel.name != lobby_name and ctx.channel.name != lobby_name:
             await ctx.send(f"No queueing in the {ctx.channel.name} channel.")
             return
 
         player = ctx.author
 
-        if ctx.channel.name == "blue_queue":
-            if player in self.orange_queue:
-                await ctx.send("You cannot queue in orange and blue at the same time.")
+        if ctx.channel.name == lobby_name:
+            if player in self.lobby_queue:
+                await ctx.send(f'You are already in the 6mans queue!')
                 return
-            if player in self.blue_queue:
-                await ctx.send(f'You are already in the blue queue!')
+            if len(self.lobby_queue) == 6:
                 return
-            if len(self.blue_queue) == 6:
-                return
-            self.blue_queue.append(player)
+            self.lobby_queue.append(player)
 
-            if len(self.blue_queue) < 6:
-                blue_embed = discord.Embed(title=f'{len(self.blue_queue)} players are in the blue queue!')
+            if len(self.lobby_queue) < 6:
+                blue_embed = discord.Embed(title=f'{len(self.lobby_queue)} players are in the queue!')
                 blue_embed.color = discord.Color.blue()
-                blue_embed.description = f'{player.mention} has joined the queue.'
+                self.q_emb_mention += " {0} ".format(player.mention)
+                blue_embed.description = f'{player.mention} has joined the queue.\n Current Queue: \n' + "{0}".format(self.q_emb_mention)
                 await ctx.send(embed=blue_embed)
 
-            if len(self.blue_queue) == MAX_QUEUE:
-                user = random.randint(1, 1000)
-                password = random.randint(1, 1000)
-                credentials = f'**Here are your lobby details**\n\t__Username__:{user}\n\t__Password__:{password}'
-                bluepop_embed = discord.Embed(title=f'Blue queue has been popped! {MAX_QUEUE} players have queued up.')
+            if len(self.lobby_queue) == MAX_QUEUE:
+                user = random.randint(999, 9999)
+                password = random.randint(999, 9999)
+                credentials = f'**Here are your lobby details - {datetime.now()}**\n\t__Name__: {user}\n\t__Password__: {password}'
+                bluepop_embed = discord.Embed(title=f'Queue has been popped! {MAX_QUEUE} players have queued up.')
                 bluepop_embed.color = discord.Color.green()
                 await ctx.send(embed=bluepop_embed)
-                await ctx.send(" ".join(player.mention for player in self.blue_queue))
-                for member in self.blue_queue:
+                await ctx.send(" ".join(player.mention for player in self.lobby_queue))
+                tempLobby = await self.create_lobby(ctx)
+                for member in self.lobby_queue:
                     await member.send(credentials)
-                await self.create_lobby(ctx)
-                await self.random_teams(ctx, self.blue_queue)
-                self.blue_queue = []
-                new_queue = discord.Embed(title=f'Blue queue has been reset', color=discord.Color.blue())
-                await ctx.send(embed=new_queue)
-
-        if ctx.channel.name == "orange_queue":
-            if player in self.blue_queue:
-                await ctx.send("You cannot queue in orange and blue at the same time.")
-                return
-            if player in self.orange_queue:
-                await ctx.send(f'You are already in the orange queue!')
-                return
-            if len(self.orange_queue) == 6:
-                return
-            self.orange_queue.append(player)
-            if len(self.orange_queue) < 6:
-                orange_embed = discord.Embed(title=f'{len(self.orange_queue)} players are in the orange queue!')
-                orange_embed.color = discord.Color.orange()
-                orange_embed.description = f'{player.mention} has joined the queue.'
-                await ctx.send(embed=orange_embed)
-
-            if len(self.orange_queue) == MAX_QUEUE:
-                user = random.randint(1, 1000)
-                password = random.randint(1, 1000)
-                credentials = f'**Here are your lobby details**\n\t__Username__:{user}\n\t__Password__:{password}'
-                orangepop_embed = discord.Embed(title=f'Queue has been popped! {MAX_QUEUE} players have queued up')
-                orangepop_embed.color = discord.Color.green()
-                await ctx.send(embed=orangepop_embed)
-                await ctx.send(" ".join(player.mention for player in self.orange_queue))
-                for member in self.orange_queue:
-                    await member.send(credentials)
-
-                await self.create_lobby(ctx)
-                await self.random_teams(ctx, self.orange_queue)
-
-                self.orange_queue = []
-                new_queue = discord.Embed(title=f'Orange queue has been reset', color=discord.Color.orange())
+                    tempLobby.addPlayer(member)               
+                await self.random_teams(ctx, self.lobby_queue, tempLobby) 
+                LOBBY_LISTINGS.append(tempLobby)
+                self.lobby_queue = []
+                new_queue = discord.Embed(title=f'Queue has been reset', color=discord.Color.blue())
+                print("Queue has been Reset")
                 await ctx.send(embed=new_queue)
 
     @commands.command(name="lobby", description="Creates a lobby if 6 players are ready to play.")
     async def manual_lobby(self, ctx):
-        if ctx.channel.name != "blue_queue" and ctx.channel.name != "orange_queue":
+        if ctx.channel.name != lobby_name:
             await ctx.send(f"Please go to correct channels (orange_queue) or (blue_queue).")
             return
-        await self.create_lobby(ctx)
-        user = random.randint(1, 1000)
-        password = random.randint(1,1000)
-        credentials = f'**Here are your lobby details**\n\t__Username__:{user}\n\t__Password__:{password}'
+        tempLobby = await self.create_lobby(ctx)
+        user = random.randint(999, 9999)
+        password = random.randint(999, 9999)
+        tempLobby.addPlayer(ctx.author)
+        LOBBY_LISTINGS.append(tempLobby)
+        credentials = f'**Here are your lobby details - {datetime.now()}**\n\t__Name__:{user}\n\t__Password__:{password}'
         await ctx.author.send(credentials)
+        
+
 
     @commands.command(name="leave", description="Lets the user leave the queue.")
     async def leave_lobby(self, ctx):
-        if ctx.channel.name != "blue_queue" and ctx.channel.name != "orange_queue":
-            await ctx.send(f"Please go to correct channels (orange_queue) or (blue_queue).")
+        if ctx.channel.name != lobby_name:
+            await ctx.send(f"Please go to correct channels.")
             return
         player = ctx.author
-        if ctx.channel.name == "blue_queue":
-            if player not in self.blue_queue:
-                await ctx.send("You are not currently in the blue queue.")
+        if ctx.channel.name == lobby_name:
+            if player not in self.lobby_queue:
+                await ctx.send("You are not currently in the queue.")
                 return
-            self.blue_queue.remove(player)
-            leave_embed = discord.Embed(title=f'{len(self.blue_queue)} players are in the blue queue')
-            leave_embed.description = f'{player.mention} has left.'
-            leave_embed.color = discord.Color.dark_red()
-            await ctx.send(embed=leave_embed)
-
-        if ctx.channel.name == "orange_queue":
-            if player not in self.orange_queue:
-                await ctx.send("You are not currently in the orange queue.")
-                return
-            self.orange_queue.remove(player)
-            leave_embed = discord.Embed(title=f'{len(self.orange_queue)} players are in the orange queue')
+            self.lobby_queue.remove(player)
+            leave_embed = discord.Embed(title=f'{len(self.lobby_queue)} players are in the queue')
             leave_embed.description = f'{player.mention} has left.'
             leave_embed.color = discord.Color.dark_red()
             await ctx.send(embed=leave_embed)
 
     @commands.command(name="status", description="Displays current status of the queue.")
     async def queue_status(self, ctx):
-        if ctx.channel.name != "blue_queue" and ctx.channel.name != "orange_queue":
-            await ctx.send(f"Please go to correct channels (orange_queue) or (blue_queue).")
+        if ctx.channel.name != lobby_name:
+            await ctx.send(f"Please go to correct channels.")
             return
-        if ctx.channel.name == "blue_queue":
-            queue_embed = discord.Embed(title=f'{len(self.blue_queue)} players are in the blue queue')
-            queue_embed.description = (" ".join(player.mention for player in self.blue_queue))
+        if ctx.channel.name == lobby_name:
+            queue_embed = discord.Embed(title=f'{len(self.blue_queue)} players are in the queue')
+            queue_embed.description = (" ".join(player.mention for player in self.lobby_queue))
             queue_embed.color = discord.Color.blue()
-            await ctx.send(embed=queue_embed)
-            return
-        if ctx.channel.name == "orange_queue":
-            queue_embed = discord.Embed(title=f'{len(self.orange_queue)} players are in the orange queue')
-            queue_embed.description = (" ".join(player.mention for player in self.orange_queue))
-            queue_embed.color = discord.Color.orange()
             await ctx.send(embed=queue_embed)
             return
 
@@ -172,20 +147,37 @@ class QueueHandler(commands.Cog, name="Queue Commands"):
                 print(f'\n{ctx.author} deleted {lobby}.\n')
                 return
         await ctx.send(f'Could not find {lobby}. My b.')
+    
+    @commands.command(name="report", description="Report Match results from a finished lobby.")
+    async def report_match(self, ctx, *args):
+        if len(args) == 0:
+            await ctx.send("You did not specify a room to report.")
+            return
+        try:
+            int(args[0])
+        except ValueError:
+            await ctx.send("That is not a valid lobby number.")
+            return
+        print("This match is reporting results")
+        print(ctx)
+        print(args)
+        await self.delete_lobby(ctx, args[0])
+
 
     @commands.command(name="remove", description="Removes a player from a queue", hidden=True)
     @commands.has_permissions(manage_channels=True)
     async def remove_from_queue(self, ctx, *, member: discord.Member):
-        if member not in self.blue_queue and member not in self.orange_queue:
+        if member not in self.lobby_queue:
             await ctx.send(f"{member.display_name} is not in a queue right now.")
             return
-        if member in self.blue_queue:
+        if member in self.lobby_queue:
             self.blue_queue.remove(member)
-            await ctx.send(f'{member.display_name} has been successfully removed from the blue queue.')
+            await ctx.send(f'{member.display_name} has been successfully removed from the queue.')
             return
-        if member in self.orange_queue:
-            self.orange_queue.remove(member)
-            await ctx.send(f'{member.display_name} has been successfully removed from the orange queue.')
+    @commands.command(name="lobprop", description="Returns the known properties for the given Lobby")
+    async def lobprop(self, ctx, *args):
+        for lob in LOBBY_LISTINGS:
+            await ctx.send(lob.display())
 
     @commands.command(hidden=True, name="addQueue")
     @commands.has_permissions(manage_channels=True)
@@ -194,14 +186,15 @@ class QueueHandler(commands.Cog, name="Queue Commands"):
         if ctx.author.id != 256963559395819520:
             await ctx.send("You do not have permission to use this command.")
             return
-        if queue == "blue":
-            self.blue_queue.append(member)
-            print("Member successfully added to blue queue")
+        if queue == "lobby":
+            self.lobby_queue.append(member)
+            print("Member successfully added to the queue")
             return
-        if queue == "orange":
-            self.orange_queue.append(member)
-            print("Member successfully added to orange queue.")
-            return
+
+    @commands.command(name='moveP', description="Move player to specified lobby")
+    async def move_player(self, ctx, lobby, member : discord.Member):
+        await self.move_players_to_vclobby(ctx, member, lobby)
+
 
     @staticmethod
     async def create_lobby(ctx):
@@ -209,25 +202,64 @@ class QueueHandler(commands.Cog, name="Queue Commands"):
         lobby_num = str(random.randint(1, 1000))
         lobby = f'Lobby {lobby_num}'
         category_channel = await server.create_category_channel(lobby)
-
         lobby_embed = discord.Embed(title=f'New Lobby has been created', type="rich", color=discord.Color.green())
-        lobby_embed.add_field(name=f'Please join {lobby}', value=f"Have fun and don't suck", inline=True)
+        lobby_embed.add_field(name=f'Please join {lobby}', value=f"Good Luck and Have Fun", inline=True)
         await ctx.send(embed=lobby_embed)
         await category_channel.create_voice_channel(lobby_num, user_limit=6)
         await category_channel.create_voice_channel("Team 1", user_limit=3)
         await category_channel.create_voice_channel("Team 2", user_limit=3)
+        tempLobby = Lobby(lobby)
+        return tempLobby
+        
 
-    async def random_teams(self, ctx, players):
-        self.team_one = random.sample(players, 3)
+    async def random_teams(self, ctx, players, Lobby : Lobby):
+        self.team_one = random.sample(players, 2)  
         for player in self.team_one:
+            Lobby.team_one.append(player)
+            await self.move_players_to_vclobby(ctx, player, Lobby)  
             players.remove(player)
         self.team_two = players
-
+        for player in self.team_two:
+            Lobby.team_two.append(player)
+            await self.move_players_to_vclobby(ctx, player, Lobby)  
         teams_embed = discord.Embed(color=discord.Color.green())
-        teams_embed.add_field(name="**Team 1**", value=f'{" ".join(player.name for player in self.team_one)}',
+        if (len(Lobby.team_one) > 0):
+            teams_embed.add_field(name="**Team 1**", value=f'{" ".join(player.name for player in self.team_one)}',
+                                inline=False)
+        if (len(Lobby.team_two) > 0):
+            teams_embed.add_field(name="**Team 2**", value=f'{" ".join(player.name for player in self.team_two)}',
                               inline=False)
-        teams_embed.add_field(name="**Team 2**", value=f'{" ".join(player.name for player in self.team_two)}',
-                              inline=False)
-        await ctx.send(embed=teams_embed)
+        #await ctx.send(embed=teams_embed)
+        print("Teams Have been made")
+ 
+    
+    async def move_players_to_vclobby(self, ctx,  member: discord.Member, lobby: Lobby):
+        server = ctx.guild
+        for category in server.categories:
+            if category.name == lobby.lobbyNumber:
+                for voice_channel in category.voice_channels:
+                    channel_id = voice_channel.id
+                    print(voice_channel.name)
+                    print(lobby.lobbyNumber)
+                    if voice_channel.name in lobby.lobbyNumber:
+                        print("Moving {0} to {1}".format(member, channel_id))
+                        try:
+                            await member.move_to(voice_channel)
+                        except:
+                            print("Could not move member")
+
+                    """
+                    if voice_channel.name == "Team 1":
+                        print(voice_channel.name)
+                        print(lobby.team_one)
+                        if any(x.name + '#' + x.discriminator == member for x in lobby.team_one):
+                            
+                    if voice_channel.name == "Team 2":
+                        print(voice_channel.name)
+                        if any(x.name + '#' + x.discriminator == member for x in lobby.team_two):
+                            await member.move_to(channel_id)
+                    """
+
+
 
 

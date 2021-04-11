@@ -5,6 +5,7 @@ configFile = "config.ini"
 discordGroup = "Discord"
 tokenKey = "token"
 prefixKey = "prefix"
+channelKey = "channel"
 
 
 class Config:
@@ -23,6 +24,7 @@ class Config:
         self.cp[discordGroup] = {}
         self.cp[discordGroup][tokenKey] = ""
         self.cp[discordGroup][prefixKey] = ""
+        self.cp[discordGroup][channelKey] = ""
 
         with open(configFile, "w") as file:
             self.cp.write(file)
@@ -34,4 +36,8 @@ class Config:
     @property
     def command_prefix(self):
         return self.cp[discordGroup][prefixKey]
+    
+    @property
+    def queue_channel(self):
+        return self.cp[discordGroup][channelKey]
 

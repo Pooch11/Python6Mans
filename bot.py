@@ -10,6 +10,7 @@ logging.basicConfig(level=logging.INFO)
 config = Config()
 prefix = config.command_prefix
 token = config.bot_token
+channel = config.queue_channel
 
 startup_extensions = ['QueueHandler', 'admin', 'ChatCommands']
 

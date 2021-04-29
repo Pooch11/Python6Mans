@@ -4,15 +4,14 @@ import logging
 import sys
 from config import Config
 
-
 logging.basicConfig(level=logging.INFO)
 
 config = Config()
 prefix = config.command_prefix
 token = config.bot_token
-channel = config.queue_channel
+q_channel = config.queue_channel
 
-startup_extensions = ['QueueHandler', 'admin', 'ChatCommands']
+startup_extensions = ['QueueHandler', 'admin', 'ChatCommands', 'LobbyManager']
 
 
 if not prefix or not token:
@@ -33,7 +32,7 @@ async def on_command_error(ctx, error):
 @client.event
 async def on_ready():
     print(f'{client.user.name} has logged in.')
-    await client.change_presence(activity=discord.Game(name="dropshot w/ Toasty"))
+    await client.change_presence(activity=discord.Game(name="with my heart."))
 
 if __name__ == '__main__':
 

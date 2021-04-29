@@ -6,6 +6,7 @@ discordGroup = "Discord"
 tokenKey = "token"
 prefixKey = "prefix"
 channelKey = "channel"
+lbsizeKey = "sizekey"
 
 
 class Config:
@@ -25,7 +26,7 @@ class Config:
         self.cp[discordGroup][tokenKey] = ""
         self.cp[discordGroup][prefixKey] = ""
         self.cp[discordGroup][channelKey] = ""
-
+        self.cp[discordGroup][lbsizeKey] = ""
         with open(configFile, "w") as file:
             self.cp.write(file)
 
@@ -40,4 +41,8 @@ class Config:
     @property
     def queue_channel(self):
         return self.cp[discordGroup][channelKey]
+    
+    @property
+    def lobby_size(self):
+        return self.cp[discordGroup][lbsizeKey]
 
